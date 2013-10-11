@@ -38,7 +38,7 @@ namespace Tests
 				var server =
 					new EventHttpListener(r => r.Respond(System.Net.HttpStatusCode.OK, new Dictionary<string, string>(), new byte[0])))
 			{
-				server.Start("127.0.0.1", _freePort);
+				server.Start("127.0.0.1", _freePort, 10);
 				var wc = new WebClient();
 				
 				wc.DownloadData(_urlBase);

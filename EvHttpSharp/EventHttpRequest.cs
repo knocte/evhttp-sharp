@@ -8,7 +8,7 @@ namespace EvHttpSharp
 {
 	public class EventHttpRequest
 	{
-		private readonly EventHttpListener _listener;
+		private readonly EventHttpWorker _worker;
 		private readonly EvHttpRequest _handle;
 		public string Method { get; set; }
 		public string Uri { get; set; }
@@ -16,9 +16,9 @@ namespace EvHttpSharp
 		public IDictionary<string, IEnumerable<string>> Headers { get; set; }
 		public byte[] RequestBody { get; set; }
 
-		public EventHttpRequest(EventHttpListener listener, IntPtr handle)
+		internal EventHttpRequest(EventHttpWorker worker, IntPtr handle)
 		{
-			_listener = listener;
+			_worker = worker;
 			_handle = new EvHttpRequest(handle);
 			Method = Event.EvHttpRequestGetCommand(_handle).ToString().ToUpper();
 			Uri = Marshal.PtrToStringAnsi(Event.EvHttpRequestGetUri(_handle));
@@ -46,7 +46,7 @@ namespace EvHttpSharp
 			Event.EvHttpAddHeader(pHeaders, "Content-Length", body.Length.ToString());
 			var buffer = Event.EvBufferNew();
 			Event.EvBufferAdd(buffer, body, new IntPtr(body.Length));
-			_listener.Sync(() =>
+			_worker.Sync(() =>
 				{
 					Event.EvHttpSendReply(_handle, (int) code, code.ToString(), buffer);
 					buffer.Dispose();

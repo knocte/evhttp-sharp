@@ -1,113 +1,59 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Threading;
+using System.Linq;
+using System.Net;
 using System.Runtime.InteropServices;
+using System.Text;
 using EvHttpSharp.Interop;
 
 namespace EvHttpSharp
 {
 	public class EventHttpListener : IDisposable
 	{
-		private readonly RequestCallback _cb;
 		public delegate void RequestCallback(EventHttpRequest req);
 
-		private EventBase _eventBase;
-		private EvHttp _evHttp;
-		private Thread _thread;
-		private GCHandle _httpCallbackHandle;
-		private EvUserEvent _syncCbUserEvent;
-		private readonly Queue<Action> _syncCallbacks = new Queue<Action>();
-		private bool _stop;
+		private readonly RequestCallback _requestHandler;
+		
+		private int _workers;
+		private List<EventHttpWorker> _workerList;
 
-		public EventHttpListener(RequestCallback cb)
+		public EventHttpListener(RequestCallback requestHandler)
 		{
-			LibLocator.TryToLoadDefaultIfNotInitialized();
-			_cb = cb;
+			_requestHandler = requestHandler;
 		}
 
-		public void Start(string host, ushort port)
+		public void Start(string host, ushort port, int workers = 1)
 		{
-			_eventBase = Event.EventBaseNew();
-			if (_eventBase.IsInvalid)
-				throw new IOException("Unable to create event_base");
-			_evHttp = Event.EvHttpNew(_eventBase);
-			if (_evHttp.IsInvalid)
-			{
-				Dispose();
-				throw new IOException ("Unable to create evhttp");
-			}
-			var socket = Event.EvHttpBindSocketWithHandle(_evHttp, host, port);
-			if (socket.IsInvalid)
-			{
-				Dispose();
-				throw new IOException("Unable to bind to the specified address");
-			}
-
-			_thread = new Thread(MainCycle);
-			_thread.Start();
-		}
-
-		private void MainCycle()
-		{
-			var cb = new Event.D.evhttp_request_callback (RequestHandler);
-			_httpCallbackHandle = GCHandle.Alloc (cb);
-			Event.EvHttpSetAllowedMethods (_evHttp, EvHttpCmdType.All);
-			Event.EvHttpSetGenCb (_evHttp, cb, GCHandle.ToIntPtr (_httpCallbackHandle));
-
-			using (_syncCbUserEvent = new EvUserEvent(_eventBase))
-			{
-				_syncCbUserEvent.Triggered += SyncCallback;
-				while (!_stop)
+			_workers = workers;
+			var soaddr = new Event.sockaddr_in
 				{
-					Event.EventBaseDispatch(_eventBase);
-				}
+					sin_family = Event.AF_INET,
+					sin_port = (ushort) IPAddress.HostToNetworkOrder((short) port),
+					sin_addr = 0,
+					sin_zero = new byte[8]
+				};
+
+			IntPtr fd;
+			using(var evBase = Event.EventBaseNew())
+			using (var listener = Event.EvConnListenerNewBind(evBase, IntPtr.Zero, IntPtr.Zero, 0, 64, ref soaddr,
+			                                                  Marshal.SizeOf(soaddr)))
+				fd = listener.FileDescriptor;
+			
+			_workerList = new List<EventHttpWorker> ();
+			for (var c = 0; c < _workers; c++)
+			{
+				var worker = new EventHttpWorker (_requestHandler);
+				worker.Start (fd);
+				_workerList.Add (worker);
 			}
-			//We've recieved loopbreak from actual Dispose, so dispose now
-			DoDispose ();
-			_httpCallbackHandle.Free ();
-		}
-
-		private void SyncCallback(object sender, EventArgs eventArgs)
-		{
-			lock (_syncCallbacks)
-				while (_syncCallbacks.Count != 0)
-					_syncCallbacks.Dequeue()();
-		}
-
-		private void RequestHandler(IntPtr request, IntPtr arg)
-		{
-			var req = new EventHttpRequest (this, request);
-			_cb (req);
-		}
-
-		internal void Sync(Action cb)
-		{
-			lock (_syncCallbacks)
-				_syncCallbacks.Enqueue(cb);
-			Event.EventActive(_syncCbUserEvent);
-		}
-
-		private void DoDispose()
-		{
-			if (_evHttp != null && !_evHttp.IsInvalid)
-				_evHttp.Dispose ();
-			if (_eventBase != null && !_eventBase.IsInvalid)
-				_eventBase.Dispose();
 		}
 
 		public void Dispose()
 		{
-			if (_thread == null)
-				DoDispose();
-			else if (_eventBase != null && !_eventBase.IsClosed)
-			{
-				_stop = true;
-				Sync(() => Event.EventBaseLoopbreak(_eventBase));
-				if (_thread != Thread.CurrentThread)
-					_thread.Join ();
-			}
-
+			foreach (var worker in _workerList)
+				worker.Dispose ();
+			
+			
 		}
 	}
 }

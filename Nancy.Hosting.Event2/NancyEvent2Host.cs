@@ -14,14 +14,16 @@ namespace Nancy.Hosting.Event2
 	{
 		private readonly string _host;
 		private readonly int _port;
+		private readonly int _workers;
 		private readonly INancyBootstrapper _bootstrapper;
 		private readonly INancyEngine _engine;
 		private EventHttpListener _listener;
 
-		public NancyEvent2Host(string host, int port, INancyBootstrapper bootstrapper)
+		public NancyEvent2Host(string host, int port, int workers, INancyBootstrapper bootstrapper)
 		{
 			_host = host;
 			_port = port;
+			_workers = workers;
 			_bootstrapper = bootstrapper;
 			_bootstrapper.Initialise();
 			_engine = _bootstrapper.GetEngine();
@@ -30,7 +32,7 @@ namespace Nancy.Hosting.Event2
 		public void Start()
 		{
 			_listener = new EventHttpListener(RequestHandler);
-			_listener.Start(_host, (ushort) _port);
+			_listener.Start(_host, (ushort) _port, _workers);
 		}
 
 		public void Stop()
