@@ -49,7 +49,7 @@ namespace EvHttpSharp
 				Dispose ();
 				throw new IOException ("Unable to create evhttp");
 			}
-			_listener = Event.EvConnListenerNew (_eventBase, IntPtr.Zero, IntPtr.Zero, 0, 64, _fd);
+			_listener = Event.EvConnListenerNew (_eventBase, IntPtr.Zero, IntPtr.Zero, 1u << 3, 256, _fd);
 			_listener.Disown();
 			var socket = Event.EvHttpBindListener (_evHttp, _listener);
 			if (socket.IsInvalid)
@@ -106,6 +106,11 @@ namespace EvHttpSharp
 
 		internal void Sync(Action cb)
 		{
+			if (_syncCallbacks.Count == 0 && Thread.CurrentThread == _thread)
+			{
+				cb();
+				return;
+			}
 			lock (_syncCallbacks)
 				_syncCallbacks.Enqueue(cb);
 			Event.EventActive(_syncCbUserEvent);

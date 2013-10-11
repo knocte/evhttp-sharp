@@ -19,6 +19,7 @@ namespace EvHttpSharp
 
 		public EventHttpListener(RequestCallback requestHandler)
 		{
+			LibLocator.TryToLoadDefaultIfNotInitialized();
 			_requestHandler = requestHandler;
 		}
 
@@ -35,7 +36,7 @@ namespace EvHttpSharp
 
 			IntPtr fd;
 			using(var evBase = Event.EventBaseNew())
-			using (var listener = Event.EvConnListenerNewBind(evBase, IntPtr.Zero, IntPtr.Zero, 0, 64, ref soaddr,
+			using (var listener = Event.EvConnListenerNewBind (evBase, IntPtr.Zero, IntPtr.Zero, 1u << 3, 256, ref soaddr,
 			                                                  Marshal.SizeOf(soaddr)))
 				fd = listener.FileDescriptor;
 			
