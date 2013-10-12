@@ -83,7 +83,7 @@ namespace EvHttpSharp
 				_syncCbUserEvent.Triggered += SyncCallback;
 				while (!_stop)
 				{
-					Event.EventBaseDispatch(_eventBase);
+					Event.EventBaseLoop(_eventBase, 0);
 				}
 			}
 			//We've recieved loopbreak from actual Dispose, so dispose now
