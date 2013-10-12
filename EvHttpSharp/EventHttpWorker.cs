@@ -113,7 +113,7 @@ namespace EvHttpSharp
 			}
 			lock (_syncCallbacks)
 				_syncCallbacks.Enqueue(cb);
-			Event.EventActive(_syncCbUserEvent);
+			_syncCbUserEvent.Active();
 		}
 
 		private void DoDispose()

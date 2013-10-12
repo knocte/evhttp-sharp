@@ -46,9 +46,9 @@ namespace EvHttpSharp.Interop
 				_event.Dispose();
 		}
 
-		public static implicit operator EvEvent(EvUserEvent ev)
+		public void Active()
 		{
-			return ev._event;
+			Event.EventActive(_event.DangerousGetHandle());
 		}
 	}
 }

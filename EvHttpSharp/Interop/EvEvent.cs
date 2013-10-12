@@ -5,14 +5,28 @@ namespace EvHttpSharp.Interop
 {
 	class EvEvent : SafeHandle
 	{
+		private string _created;
 		public EvEvent() : base(IntPtr.Zero, true)
 		{
-			
+			_created = Environment.StackTrace;
 		}
+
+		readonly object _lock = new object();
+		private bool _released;
 
 		protected override bool ReleaseHandle()
 		{
-			Event.EventFree(handle);
+			lock (_lock)
+			{
+				if (!_released)
+					Event.EventFree (handle);
+				else
+				{
+					return true;
+				}
+				_released = true;
+			}
+			
 			return true;
 		}
 
